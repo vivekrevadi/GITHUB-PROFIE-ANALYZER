@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OctoScan - GitHub Profile Analyzer</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-layout">
+        <!-- LEFT SIDEBAR -->
+        <aside class="app-sidebar">
+            <div class="sidebar-brand">
+                <i data-lucide="github" class="brand-icon"></i>
+                <h2>Octo<span>Scan</span></h2>
+            </div>
+            
+            <div class="sidebar-menu-wrapper">
+                <span class="menu-label">Menu</span>
+                <nav class="sidebar-nav">
+                    <button class="nav-item active" id="tabAnalyze" onclick="switchTab('analyze')">
+                        <i data-lucide="layout-dashboard"></i>
+                        <span>My Activity</span>
+                    </button>
+                    <button class="nav-item" id="tabCompare" onclick="switchTab('compare')">
+                        <i data-lucide="git-compare"></i>
+                        <span>Compare Profiles</span>
+                    </button>
+                    <button class="nav-item" id="btnSettingsMenu">
+                        <i data-lucide="settings"></i>
+                        <span>API Credentials</span>
+                    </button>
+                </nav>
+            </div>
+
+            <!-- Sidebar User Widget (shows active search user details at bottom) -->
+            <div class="sidebar-user-widget" id="sidebarUserWidget">
+                <img id="sidebarUserAvatar" src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" alt="User Avatar" class="user-widget-avatar">
+                <div class="user-widget-info">
+                    <span class="user-widget-name" id="sidebarUserName">Search User</span>
+                    <span class="user-widget-login" id="sidebarUserLogin">@github</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- CENTER & RIGHT CONTENT CONTAINER -->
+        <div class="main-container">
+            <!-- TOP BAR -->
+            <header class="top-bar">
+                <div class="search-bar-container" id="topSearchBarContainer">
+                    <form id="searchForm" class="top-search-form" onsubmit="handleSearchSubmit(event)">
+                        <div class="search-input-wrap">
+                            <i data-lucide="search" class="search-icon"></i>
+                            <input type="text" id="usernameInput" placeholder="Search GitHub username..." required autocomplete="off">
+                        </div>
+                    </form>
+                </div>
+                
+                <div class="top-bar-actions">
+                    <div class="quick-searches">
+                        <button class="quick-btn" onclick="triggerQuickSearch('torvalds')">torvalds</button>
+                        <button class="quick-btn" onclick="triggerQuickSearch('yyx990803')">yyx990803</button>
+                        <button class="quick-btn" onclick="triggerQuickSearch('gaearon')">gaearon</button>
+                    </div>
+                    
+                    <div class="rate-badge" id="rateLimitBadge">
+                        <i data-lucide="activity"></i>
+                        <span id="rateLimitCount">60/60</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- DASHBOARD AREA -->
+            <main class="content-view">
+                <!-- EMPTY / SEARCH WELCOME STATE -->
+                <section id="sectionWelcome" class="welcome-section">
+                    <div class="welcome-card card">
+                        <div class="welcome-icon-wrap">
+                            <i data-lucide="search-code"></i>
+                        </div>
+                        <h2>Enter a GitHub Username to Start</h2>
+                        <p>Search any profile to analyze repositories, language distribution, developer scores, and achievements in a clean visual dashboard.</p>
+                        
+                        <div class="welcome-quick-links">
+                            <span>Popular lookups:</span>
+                            <div class="pill-group">
+                                <button class="quick-pill" onclick="triggerQuickSearch('torvalds')">Linus Torvalds</button>
+                                <button class="quick-pill" onclick="triggerQuickSearch('yyx990803')">Evan You</button>
+                                <button class="quick-pill" onclick="triggerQuickSearch('gaearon')">Dan Abramov</button>
+                                <button class="quick-pill" onclick="triggerQuickSearch('ry')">Ryan Dahl</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- LOADER STATE -->
+                <div id="loader" class="loader-container hidden">
+                    <div class="spinner"></div>
+                    <p class="loader-text">Analyzing profile data, scanning repositories, calculating score...</p>
+                    <div class="skeleton-dashboard">
+                        <div class="skeleton card" style="height: 140px;"></div>
+                        <div class="skeleton card" style="height: 100px;"></div>
+                        <div class="skeleton card" style="height: 250px;"></div>
+                    </div>
+                </div>
+
+                <!-- ERROR STATE -->
+                <div id="errorMessage" class="error-container card hidden">
+                    <div class="error-icon-wrapper">
+                        <i data-lucide="alert-circle" class="error-icon"></i>
+                    </div>
+                    <h3 id="errorTitle">User Not Found</h3>
+                    <p id="errorDescription">We couldn't retrieve profile details. Double check the spelling or check API limits.</p>
+                    <button class="btn btn-secondary" onclick="dismissError()">Go Back</button>
+                </div>
+
+                <!-- PROFILE DASHBOARD GRID -->
+                <section id="sectionDashboard" class="dashboard-grid hidden">
+                    <div class="dashboard-left-col">
+                        <!-- User Profile Card -->
+                        <div class="profile-header-card card animate-in">
+                            <img id="userAvatar" src="" alt="Avatar" class="profile-avatar">
+                            <div class="profile-info-body">
+                                <div class="profile-title-row">
+                                    <div>
+                                        <h2 id="userName">Fred Jhonson</h2>
+                                        <p id="userLogin">@username</p>
+                                    </div>
+                                    <div class="rank-capsule">
+                                        <span class="rank-label">Rank</span>
+                                        <span id="rankBadge" class="rank-val">A</span>
+                                    </div>
+                                </div>
+                                <p id="userBio" class="profile-bio">This developer has no bio.</p>
+                                
+                                <div class="profile-details-grid">
+                                    <div class="p-detail" id="detailCompany">
+                                        <i data-lucide="building"></i>
+                                        <span id="userCompany">Company</span>
+                                    </div>
+                                    <div class="p-detail" id="detailLocation">
+                                        <i data-lucide="map-pin"></i>
+                                        <span id="userLocation">Location</span>
+                                    </div>
+                                    <div class="p-detail" id="detailBlog">
+                                        <i data-lucide="link"></i>
+                                        <a id="userBlog" href="#" target="_blank">Website</a>
+                                    </div>
+                                    <div class="p-detail" id="detailJoined">
+                                        <i data-lucide="calendar"></i>
+                                        <span id="userJoined">Joined 2012</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Score Meter Card -->
+                        <div class="score-card card animate-in delay-1">
+                            <div class="score-card-header">
+                                <h3>Global Score</h3>
+                                <span class="score-numeric" id="rankScore">85/100</span>
+                            </div>
+                            <div class="bar-progress-container">
+                                <div class="bar-progress-fill" id="scoreBar" style="width: 85%;"></div>
+                            </div>
+                            <p class="score-desc" id="rankExplanation">Score is calculated based on repository quality, popularity, forks, and followers.</p>
+                        </div>
+
+                        <!-- Pastel Summary Cards (Grid of 4) -->
+                        <div class="pastel-summary-grid animate-in delay-1">
+                            <div class="pastel-card green">
+                                <span class="pastel-num" id="statRepos">0</span>
+                                <span class="pastel-label">Public Repos</span>
+                            </div>
+                            <div class="pastel-card yellow">
+                                <span class="pastel-num" id="statStars">0</span>
+                                <span class="pastel-label">Total Stars</span>
+                            </div>
+                            <div class="pastel-card cyan">
+                                <span class="pastel-num" id="statForks">0</span>
+                                <span class="pastel-label">Total Forks</span>
+                            </div>
+                            <div class="pastel-card purple">
+                                <span class="pastel-num" id="statFollowers">0</span>
+                                <span class="pastel-label">Followers</span>
+                            </div>
+                        </div>
+
+                        <!-- Repositories and Charts Row -->
+                        <div class="dashboard-row animate-in delay-2">
+                            <!-- Repositories List -->
+                            <div class="repos-list-card card">
+                                <div class="card-header">
+                                    <h3>Top Starred Repositories</h3>
+                                    <span class="header-hint" id="reposListedCount">Showing Top 5</span>
+                                </div>
+                                <div class="repos-list-container" id="reposListContainer">
+                                    <!-- Dynamic repo cards go here -->
+                                </div>
+                            </div>
+
+                            <!-- Language Distribution Card -->
+                            <div class="chart-card card">
+                                <div class="card-header">
+                                    <h3>Language Distribution</h3>
+                                </div>
+                                <div class="languages-chart-wrap">
+                                    <canvas id="languagesChart"></canvas>
+                                </div>
+                                <div class="chart-stats-summary">
+                                    <div class="summary-stat-row">
+                                        <span>Avg Stars/Repo</span>
+                                        <strong id="valAvgStars">0.0</strong>
+                                    </div>
+                                    <div class="summary-stat-row">
+                                        <span>Avg Forks/Repo</span>
+                                        <strong id="valAvgForks">0.0</strong>
+                                    </div>
+                                    <div class="summary-stat-row">
+                                        <span>Primary Stack</span>
+                                        <strong id="valPrimaryLanguage">None</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- PROFILE COMPARISON SCREEN -->
+                <section id="sectionCompare" class="compare-section hidden">
+                    <div class="compare-search-card card">
+                        <h2>Compare Developer Profiles</h2>
+                        <p class="compare-subtitle">Compare repository statistics, languages, achievements, and levels side-by-side.</p>
+                        
+                        <form id="compareForm" class="compare-form" onsubmit="handleCompareSubmit(event)">
+                            <div class="compare-inputs-grid">
+                                <div class="input-wrapper">
+                                    <i data-lucide="user" class="input-icon"></i>
+                                    <input type="text" id="compareUserA" placeholder="First developer (e.g. torvalds)" required autocomplete="off">
+                                </div>
+                                <div class="vs-divider">VS</div>
+                                <div class="input-wrapper">
+                                    <i data-lucide="user" class="input-icon"></i>
+                                    <input type="text" id="compareUserB" placeholder="Second developer (e.g. gaearon)" required autocomplete="off">
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-compare" id="btnCompareSubmit">
+                                <i data-lucide="git-compare"></i> Compare Developers
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- COMPARISON LOADER -->
+                    <div id="compareLoader" class="loader-container hidden">
+                        <div class="spinner"></div>
+                        <p class="loader-text">Comparing profiles, fetching repository statistics...</p>
+                    </div>
+
+                    <!-- COMPARISON RESULT -->
+                    <div id="compareResult" class="compare-result-container hidden animate-in">
+                        <div class="compare-headers">
+                            <!-- User A -->
+                            <div class="compare-user-head card" id="compHeadA">
+                                <img src="" alt="Avatar A" class="compare-avatar" id="compAvatarA">
+                                <h3 id="compNameA">Name A</h3>
+                                <p id="compLoginA">@usernameA</p>
+                                <span id="compBadgeA" class="rank-capsule-sm">A</span>
+                            </div>
+                            
+                            <div class="vs-badge">VS</div>
+                            
+                            <!-- User B -->
+                            <div class="compare-user-head card" id="compHeadB">
+                                <img src="" alt="Avatar B" class="compare-avatar" id="compAvatarB">
+                                <h3 id="compNameB">Name B</h3>
+                                <p id="compLoginB">@usernameB</p>
+                                <span id="compBadgeB" class="rank-capsule-sm">B</span>
+                            </div>
+                        </div>
+
+                        <!-- Stats Table Grid -->
+                        <div class="compare-table-card card">
+                            <h3>Statistical Breakdown</h3>
+                            
+                            <div class="compare-rows">
+                                <div class="compare-row-item">
+                                    <div class="comp-val val-left" id="compScoreA">0</div>
+                                    <div class="comp-label">Profile Score</div>
+                                    <div class="comp-val val-right" id="compScoreB">0</div>
+                                </div>
+                                <div class="compare-row-item">
+                                    <div class="comp-val val-left" id="compFollowersA">0</div>
+                                    <div class="comp-label">Followers</div>
+                                    <div class="comp-val val-right" id="compFollowersB">0</div>
+                                </div>
+                                <div class="compare-row-item">
+                                    <div class="comp-val val-left" id="compReposA">0</div>
+                                    <div class="comp-label">Public Repos</div>
+                                    <div class="comp-val val-right" id="compReposB">0</div>
+                                </div>
+                                <div class="compare-row-item">
+                                    <div class="comp-val val-left" id="compStarsA">0</div>
+                                    <div class="comp-label">Total Stars</div>
+                                    <div class="comp-val val-right" id="compStarsB">0</div>
+                                </div>
+                                <div class="compare-row-item">
+                                    <div class="comp-val val-left" id="compForksA">0</div>
+                                    <div class="comp-label">Total Forks</div>
+                                    <div class="comp-val val-right" id="compForksB">0</div>
+                                </div>
+                                <div class="compare-row-item">
+                                    <div class="comp-val val-left" id="compAvgStarsA">0</div>
+                                    <div class="comp-label">Avg Stars / Repo</div>
+                                    <div class="comp-val val-right" id="compAvgStarsB">0</div>
+                                </div>
+                                <div class="compare-row-item">
+                                    <div class="comp-val val-left" id="compBadgesCountA">0</div>
+                                    <div class="comp-label">Unlocked Badges</div>
+                                    <div class="comp-val val-right" id="compBadgesCountB">0</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Winner Card -->
+                        <div class="winner-card card">
+                            <div class="winner-trophy">
+                                <i data-lucide="trophy"></i>
+                            </div>
+                            <h3>Comparison Champion</h3>
+                            <h2 id="winnerName" class="winner-name-text">Torvalds</h2>
+                            <p id="winnerReason">Highest profile score based on overall repository activity and community impact.</p>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+
+        <!-- RIGHT SIDEBAR (LIVE FEED / ACHIEVEMENTS) -->
+        <aside class="activity-sidebar" id="activitySidebar">
+            <div class="activity-header">
+                <h3>Live Feed</h3>
+                <span class="online-indicator"><span class="dot"></span> Online</span>
+            </div>
+            
+            <div class="activity-section">
+                <span class="section-title">Unlocked Achievements</span>
+                <div class="badges-timeline" id="badgesContainer">
+                    <p class="timeline-empty">Search a profile to view earned achievements.</p>
+                </div>
+            </div>
+
+            <!-- API Limits Display inside Right Sidebar -->
+            <div class="sidebar-limits-card">
+                <div class="limit-row">
+                    <span class="limit-lbl">Remaining Requests</span>
+                    <strong id="limitRemainingVal">60</strong>
+                </div>
+                <div class="limit-row">
+                    <span class="limit-lbl">Total Rate Limit</span>
+                    <strong id="limitMaxVal">60</strong>
+                </div>
+                <div class="limit-row">
+                    <span class="limit-lbl">Resetting At</span>
+                    <strong id="limitResetVal">--:--</strong>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- CREDENTIALS / SETTINGS MODAL -->
+    <div id="settingsModal" class="modal-overlay hidden">
+        <div class="modal card">
+            <div class="modal-header">
+                <h3>GitHub API Credentials</h3>
+                <button class="icon-btn close-modal" id="btnLocalCloseModal"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-body">
+                <p>GitHub limits unauthenticated API queries to 60 requests per hour. Add a <strong>Personal Access Token (PAT)</strong> to increase this limit to 5,000 queries per hour and query larger profiles.</p>
+                
+                <form id="settingsForm" onsubmit="saveSettings(event)">
+                    <div class="form-group">
+                        <label for="patInput">Personal Access Token (fine-grained or classic)</label>
+                        <input type="password" id="patInput" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+                        <span class="input-hint">This token is stored strictly in your browser's local storage and is sent only to GitHub.</span>
+                    </div>
+
+                    <div class="api-status-info">
+                        <h4>API Resource Limits</h4>
+                        <div class="api-status-grid">
+                            <div class="status-cell">
+                                <span class="cell-label">Limit</span>
+                                <span id="modalLimitVal">60</span>
+                            </div>
+                            <div class="status-cell">
+                                <span class="cell-label">Remaining</span>
+                                <span id="modalRemainingVal" class="text-glow">60</span>
+                            </div>
+                            <div class="status-cell">
+                                <span class="cell-label">Reset Time</span>
+                                <span id="modalResetVal">--:--</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" id="btnResetToken" onclick="clearToken()">Clear Token</button>
+                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script file -->
+    <script src="app.js"></script>
+</body>
+</html>
