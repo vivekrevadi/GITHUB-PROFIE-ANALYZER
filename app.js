@@ -14,6 +14,13 @@ const BASE_URL = 'https://api.github.com';
 
 // Initialize on Load
 window.addEventListener('DOMContentLoaded', () => {
+    // Load and Apply Theme from localStorage
+    const savedTheme = localStorage.getItem('gexplorer_theme') || 'light';
+    if (savedTheme === 'dark') {
+        document.body.classList.add('dark-theme');
+        updateThemeIcon(true);
+    }
+
     // Initialize Lucide icons
     lucide.createIcons();
     
@@ -40,7 +47,42 @@ window.addEventListener('DOMContentLoaded', () => {
     modal.addEventListener('click', (e) => {
         if (e.target === modal) modal.classList.add('hidden');
     });
+
+    // Developer Console - Micro Latency Fluctuations
+    const latencyEl = document.getElementById('consoleLatency');
+    if (latencyEl) {
+        setInterval(() => {
+            const currentLatency = Math.floor(Math.random() * 8) + 8; // 8 - 15ms
+            latencyEl.textContent = `${currentLatency}ms`;
+        }, 3000);
+    }
 });
+
+// Toggle Light/Dark Theme
+function toggleTheme() {
+    const isDark = document.body.classList.toggle('dark-theme');
+    localStorage.setItem('gexplorer_theme', isDark ? 'dark' : 'light');
+    updateThemeIcon(isDark);
+}
+
+function updateThemeIcon(isDark) {
+    const sunIcon = document.querySelector('.sun-icon');
+    const moonIcon = document.querySelector('.moon-icon');
+    if (sunIcon && moonIcon) {
+        if (isDark) {
+            sunIcon.classList.add('hidden');
+            moonIcon.classList.remove('hidden');
+        } else {
+            sunIcon.classList.remove('hidden');
+            moonIcon.classList.add('hidden');
+        }
+    }
+}
+
+// Toggle Mobile Sidebar Drawer
+function toggleMobileSidebar() {
+    document.body.classList.toggle('sidebar-open');
+}
 
 // Switch Tab Navigation
 function switchTab(tabName) {
@@ -63,7 +105,7 @@ function switchTab(tabName) {
     
     if (tabName === 'analyze') {
         tabAnalyze.classList.add('active');
-        topSearchBar.style.visibility = 'visible';
+        if (topSearchBar) topSearchBar.style.visibility = 'visible';
         
         // Show dashboard if we already analyzed someone, otherwise welcome screen
         if (state.activeUser) {
@@ -74,7 +116,7 @@ function switchTab(tabName) {
         document.getElementById('usernameInput').value = '';
     } else {
         tabCompare.classList.add('active');
-        topSearchBar.style.visibility = 'hidden';
+        if (topSearchBar) topSearchBar.style.visibility = 'hidden';
         sectionCompare.classList.remove('hidden');
         document.getElementById('compareUserA').value = '';
         document.getElementById('compareUserB').value = '';
@@ -94,6 +136,10 @@ function resetView() {
     document.getElementById('sidebarUserLogin').textContent = '@github';
     
     // Reset timeline empty state
+    const activityTimeline = document.getElementById('activityTimeline');
+    if (activityTimeline) {
+        activityTimeline.innerHTML = '<p class="timeline-empty">Search a profile to start the analysis feed.</p>';
+    }
     document.getElementById('badgesContainer').innerHTML = '<p class="timeline-empty">Search a profile to view earned achievements.</p>';
 }
 
@@ -193,23 +239,24 @@ async function updateRateLimitStatus() {
 }
 
 function updateRateLimitUI(limit, remaining, resetTime) {
-    // Top Bar Badge
-    const rateLimitCount = document.getElementById('rateLimitCount');
-    if (rateLimitCount) {
-        rateLimitCount.textContent = `${remaining}/${limit}`;
-    }
-    
-    // Sidebar limits card values
-    const sidebarRemaining = document.getElementById('limitRemainingVal');
-    const sidebarMax = document.getElementById('limitMaxVal');
-    const sidebarReset = document.getElementById('limitResetVal');
-    
-    if (sidebarRemaining && sidebarMax && sidebarReset) {
-        sidebarRemaining.textContent = remaining;
-        sidebarMax.textContent = limit;
+    // Update Live Feed Header Badge
+    const liveFeedRemaining = document.getElementById('liveFeedApiRemaining');
+    if (liveFeedRemaining) {
+        liveFeedRemaining.textContent = `API: ${remaining} left`;
         
-        const resetDate = new Date(resetTime * 1000);
-        sidebarReset.textContent = resetDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        // Dynamic pastel color adjustments based on remaining limits
+        liveFeedRemaining.className = 'api-remaining-indicator';
+        const pct = remaining / limit;
+        if (pct < 0.1) {
+            liveFeedRemaining.style.backgroundColor = 'var(--pastel-red-bg)';
+            liveFeedRemaining.style.color = 'var(--pastel-red-text)';
+        } else if (pct < 0.3) {
+            liveFeedRemaining.style.backgroundColor = 'var(--pastel-yellow-bg)';
+            liveFeedRemaining.style.color = 'var(--pastel-yellow-text)';
+        } else {
+            // Restore default themed colors
+            liveFeedRemaining.removeAttribute('style');
+        }
     }
     
     // Modal updates
@@ -322,6 +369,12 @@ function calculateAnalytics(profile, repos) {
     const repoScore = Math.min(20, (Math.min(totalRepos, 50) / 50) * 20);
     
     const finalScore = Math.round(followerScore + starsScore + forksScore + repoScore);
+    const rankFactors = [
+        { label: 'Followers', value: Math.round(followerScore), max: 30 },
+        { label: 'Stars', value: Math.round(starsScore), max: 30 },
+        { label: 'Forks', value: Math.round(forksScore), max: 20 },
+        { label: 'Repositories', value: Math.round(repoScore), max: 20 }
+    ];
     
     // Compute Rank
     let rank = 'E';
@@ -423,7 +476,63 @@ function calculateAnalytics(profile, repos) {
             color: 'cyan'
         });
     }
+
+    const activityEvents = [
+        {
+            icon: 'search-check',
+            color: 'cyan',
+            title: 'Profile fetched',
+            desc: `Loaded public GitHub profile for @${profile.login}`
+        },
+        {
+            icon: 'folder-search',
+            color: 'green',
+            title: 'Repositories scanned',
+            desc: `Analyzed ${analyzedCount} recently updated repositories`
+        },
+        {
+            icon: 'bar-chart-3',
+            color: 'purple',
+            title: 'Score calculated',
+            desc: `Rank ${rank} with ${finalScore}/100 overall score`
+        },
+        {
+            icon: 'code-2',
+            color: 'yellow',
+            title: 'Primary stack detected',
+            desc: primaryLanguage === 'None Specified' ? 'No dominant language found yet' : `${primaryLanguage} leads this profile`
+        },
+        {
+            icon: 'badge-check',
+            color: 'blue',
+            title: 'Achievements unlocked',
+            desc: `${badges.length} achievement${badges.length === 1 ? '' : 's'} ready in the feed`
+        }
+    ];
     
+    // Sum sizes & calculate hour activity distribution
+    let totalSizeKB = 0;
+    let morning = 0, afternoon = 0, evening = 0, night = 0;
+    
+    repos.forEach(repo => {
+        totalSizeKB += repo.size || 0;
+        const date = new Date(repo.updated_at || repo.pushed_at);
+        const hour = date.getHours();
+        if (hour >= 6 && hour < 12) morning++;
+        else if (hour >= 12 && hour < 18) afternoon++;
+        else if (hour >= 18 && hour < 24) evening++;
+        else night++;
+    });
+    
+    let archetype = 'Generalist 💻';
+    if (repos.length > 0) {
+        const max = Math.max(morning, afternoon, evening, night);
+        if (max === morning) archetype = 'Early Bird 🌅';
+        else if (max === afternoon) archetype = 'Daylight Runner ☀️';
+        else if (max === evening) archetype = 'Sunset Coder 🌇';
+        else archetype = 'Night Owl 🦉';
+    }
+
     return {
         totalStars,
         totalForks,
@@ -435,12 +544,21 @@ function calculateAnalytics(profile, repos) {
         score: finalScore,
         rank,
         rankExplanation,
-        badges
+        rankFactors,
+        badges,
+        activityEvents,
+        totalSizeKB,
+        archetype
     };
 }
 
 // Render Dashboard Data
 function renderDashboard(profile, repos, analytics) {
+    // Reset Repo Filter Input
+    const filterInput = document.getElementById('repoFilterInput');
+    if (filterInput) filterInput.value = '';
+    document.getElementById('reposListedCount').textContent = 'Showing Top 5';
+
     // Update Left Sidebar User Widget
     document.getElementById('sidebarUserAvatar').src = profile.avatar_url;
     document.getElementById('sidebarUserName').textContent = profile.name || profile.login;
@@ -482,6 +600,39 @@ function renderDashboard(profile, repos, analytics) {
     document.getElementById('rankScore').textContent = `${analytics.score}/100`;
     document.getElementById('scoreBar').style.width = `${analytics.score}%`;
     document.getElementById('rankExplanation').textContent = analytics.rankExplanation;
+
+    const rankFactorList = document.getElementById('rankFactorList');
+    if (rankFactorList) {
+        rankFactorList.innerHTML = '';
+        analytics.rankFactors.forEach(factor => {
+            const row = document.createElement('div');
+            row.className = 'rank-factor-row';
+            row.innerHTML = `
+                <span>${factor.label}</span>
+                <strong>${factor.value}/${factor.max}</strong>
+            `;
+            rankFactorList.appendChild(row);
+        });
+    }
+
+    const activityTimeline = document.getElementById('activityTimeline');
+    if (activityTimeline) {
+        activityTimeline.innerHTML = '';
+        analytics.activityEvents.forEach(event => {
+            const item = document.createElement('div');
+            item.className = 'activity-item';
+            item.innerHTML = `
+                <div class="badge-icon-wrap ${event.color}">
+                    <i data-lucide="${event.icon}"></i>
+                </div>
+                <div class="badge-text">
+                    <span class="badge-name">${event.title}</span>
+                    <span class="badge-desc">${event.desc}</span>
+                </div>
+            `;
+            activityTimeline.appendChild(item);
+        });
+    }
     
     // Render Badges in Right Sidebar
     const badgeContainer = document.getElementById('badgesContainer');
@@ -512,6 +663,17 @@ function renderDashboard(profile, repos, analytics) {
     document.getElementById('valAvgStars').textContent = analytics.avgStars;
     document.getElementById('valAvgForks').textContent = analytics.avgForks;
     document.getElementById('valPrimaryLanguage').textContent = analytics.primaryLanguage;
+    
+    // Format and set total size & archetype
+    const sizeKB = analytics.totalSizeKB;
+    let sizeText = `${sizeKB} KB`;
+    if (sizeKB >= 1024 * 1024) {
+        sizeText = `${(sizeKB / (1024 * 1024)).toFixed(1)} GB`;
+    } else if (sizeKB >= 1024) {
+        sizeText = `${(sizeKB / 1024).toFixed(1)} MB`;
+    }
+    document.getElementById('valTotalSize').textContent = sizeText;
+    document.getElementById('valArchetype').textContent = analytics.archetype;
     
     // Render Charts
     renderLanguagesChart(analytics.languages);
@@ -821,4 +983,68 @@ function clearToken() {
     
     // Refresh limits status
     updateRateLimitStatus();
+}
+
+// Filter Repositories by Name or Language in Real-time
+function handleRepoFilter() {
+    if (!state.activeUser) return;
+    const filterText = document.getElementById('repoFilterInput').value.toLowerCase().trim();
+    const reposList = document.getElementById('reposListContainer');
+    reposList.innerHTML = '';
+    
+    const allRepos = state.activeUser.repos;
+    
+    // Filter repos
+    const filtered = allRepos.filter(repo => {
+        const nameMatch = repo.name.toLowerCase().includes(filterText);
+        const langMatch = repo.language && repo.language.toLowerCase().includes(filterText);
+        return nameMatch || langMatch;
+    });
+    
+    // Sort and slice: if filter is empty, show top 5 starred. If active, show all matches sorted by stars.
+    let toRender = [...filtered];
+    if (!filterText) {
+        toRender = toRender.sort((a, b) => b.stargazers_count - a.stargazers_count).slice(0, 5);
+        document.getElementById('reposListedCount').textContent = 'Showing Top 5';
+    } else {
+        toRender = toRender.sort((a, b) => b.stargazers_count - a.stargazers_count);
+        document.getElementById('reposListedCount').textContent = `Found ${filtered.length} matches`;
+    }
+    
+    if (toRender.length === 0) {
+        reposList.innerHTML = '<p class="loader-text" style="padding: 20px 0; grid-column: span 2; text-align: center;">No matching repositories found.</p>';
+    } else {
+        toRender.forEach(repo => {
+            const item = document.createElement('div');
+            item.className = 'repo-item';
+            const langDotColor = getLanguageColor(repo.language);
+            item.innerHTML = `
+                <div class="repo-title-row">
+                    <a href="${repo.html_url}" target="_blank" class="repo-name">
+                        <i data-lucide="folder"></i> ${repo.name}
+                    </a>
+                    <div class="repo-meta-right">
+                        <span class="repo-stat-badge stars">
+                            <i data-lucide="star"></i> ${repo.stargazers_count}
+                        </span>
+                        <span class="repo-stat-badge forks">
+                            <i data-lucide="git-fork"></i> ${repo.forks_count}
+                        </span>
+                    </div>
+                </div>
+                <p class="repo-description">${repo.description || 'No description provided.'}</p>
+                <div class="repo-footer">
+                    ${repo.language ? `
+                        <div class="repo-language-badge">
+                            <span class="lang-dot" style="background-color: ${langDotColor};"></span>
+                            <span>${repo.language}</span>
+                        </div>
+                    ` : '<div></div>'}
+                    <span class="repo-size">${Math.round(repo.size / 1024 * 10) / 10} MB</span>
+                </div>
+            `;
+            reposList.appendChild(item);
+        });
+    }
+    lucide.createIcons();
 }

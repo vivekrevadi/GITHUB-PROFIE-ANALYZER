@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OctoScan - GitHub Profile Analyzer</title>
+    <title>Gexplorer - GitHub Profile Analyzer</title>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,7 +13,7 @@
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Stylesheet -->
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=2">
 </head>
 <body>
     <div class="app-layout">
@@ -21,7 +21,7 @@
         <aside class="app-sidebar">
             <div class="sidebar-brand">
                 <i data-lucide="github" class="brand-icon"></i>
-                <h2>Octo<span>Scan</span></h2>
+                <h2 class="apple-font-logo">Gexplorer</h2>
             </div>
             
             <div class="sidebar-menu-wrapper">
@@ -42,6 +42,19 @@
                 </nav>
             </div>
 
+            <!-- Developer Diagnostic Console Widget -->
+            <div class="sidebar-console">
+                <div class="console-header">
+                    <span class="console-title">Gexplorer Engine</span>
+                    <span class="console-status-dot"></span>
+                </div>
+                <div class="console-body">
+                    <p class="console-line">> status: stable</p>
+                    <p class="console-line">> latency: <span id="consoleLatency">12ms</span></p>
+                    <p class="console-line">> build: 1.0.8-prod</p>
+                </div>
+            </div>
+
             <!-- Sidebar User Widget (shows active search user details at bottom) -->
             <div class="sidebar-user-widget" id="sidebarUserWidget">
                 <img id="sidebarUserAvatar" src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" alt="User Avatar" class="user-widget-avatar">
@@ -50,12 +63,18 @@
                     <span class="user-widget-login" id="sidebarUserLogin">@github</span>
                 </div>
             </div>
+            <div class="sidebar-footer">
+                <span>Created by vivekrevadi</span>
+            </div>
         </aside>
 
         <!-- CENTER & RIGHT CONTENT CONTAINER -->
         <div class="main-container">
             <!-- TOP BAR -->
             <header class="top-bar">
+                <button class="hamburger-menu" id="hamburgerMenuBtn" onclick="toggleMobileSidebar()">
+                    <i data-lucide="menu"></i>
+                </button>
                 <div class="search-bar-container" id="topSearchBarContainer">
                     <form id="searchForm" class="top-search-form" onsubmit="handleSearchSubmit(event)">
                         <div class="search-input-wrap">
@@ -72,10 +91,10 @@
                         <button class="quick-btn" onclick="triggerQuickSearch('gaearon')">gaearon</button>
                     </div>
                     
-                    <div class="rate-badge" id="rateLimitBadge">
-                        <i data-lucide="activity"></i>
-                        <span id="rateLimitCount">60/60</span>
-                    </div>
+                    <button class="icon-btn theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle Light/Dark Theme">
+                        <i data-lucide="sun" class="sun-icon"></i>
+                        <i data-lucide="moon" class="moon-icon hidden"></i>
+                    </button>
                 </div>
             </header>
 
@@ -173,6 +192,24 @@
                                 <div class="bar-progress-fill" id="scoreBar" style="width: 85%;"></div>
                             </div>
                             <p class="score-desc" id="rankExplanation">Score is calculated based on repository quality, popularity, forks, and followers.</p>
+                            <div class="rank-factor-list" id="rankFactorList">
+                                <div class="rank-factor-row">
+                                    <span>Followers</span>
+                                    <strong>0/30</strong>
+                                </div>
+                                <div class="rank-factor-row">
+                                    <span>Stars</span>
+                                    <strong>0/30</strong>
+                                </div>
+                                <div class="rank-factor-row">
+                                    <span>Forks</span>
+                                    <strong>0/20</strong>
+                                </div>
+                                <div class="rank-factor-row">
+                                    <span>Repositories</span>
+                                    <strong>0/20</strong>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Pastel Summary Cards (Grid of 4) -->
@@ -199,9 +236,14 @@
                         <div class="dashboard-row animate-in delay-2">
                             <!-- Repositories List -->
                             <div class="repos-list-card card">
-                                <div class="card-header">
-                                    <h3>Top Starred Repositories</h3>
-                                    <span class="header-hint" id="reposListedCount">Showing Top 5</span>
+                                <div class="card-header repo-card-header">
+                                    <div>
+                                        <h3>Top Starred Repositories</h3>
+                                        <span class="header-hint" id="reposListedCount">Showing Top 5</span>
+                                    </div>
+                                    <div class="repo-filter-wrap">
+                                        <input type="text" id="repoFilterInput" placeholder="Filter repos by name/lang..." oninput="handleRepoFilter()">
+                                    </div>
                                 </div>
                                 <div class="repos-list-container" id="reposListContainer">
                                     <!-- Dynamic repo cards go here -->
@@ -228,6 +270,14 @@
                                     <div class="summary-stat-row">
                                         <span>Primary Stack</span>
                                         <strong id="valPrimaryLanguage">None</strong>
+                                    </div>
+                                    <div class="summary-stat-row">
+                                        <span>Code Storage Used</span>
+                                        <strong id="valTotalSize">0 KB</strong>
+                                    </div>
+                                    <div class="summary-stat-row">
+                                        <span>Coding Archetype</span>
+                                        <strong id="valArchetype">Unknown</strong>
                                     </div>
                                 </div>
                             </div>
@@ -348,33 +398,30 @@
         <aside class="activity-sidebar" id="activitySidebar">
             <div class="activity-header">
                 <h3>Live Feed</h3>
-                <span class="online-indicator"><span class="dot"></span> Online</span>
+                <div class="live-feed-badges">
+                    <span class="online-indicator"><span class="dot"></span> Online</span>
+                    <span class="api-remaining-indicator" id="liveFeedApiRemaining" title="GitHub API calls remaining before rate limit">API: 60 left</span>
+                </div>
             </div>
             
             <div class="activity-section">
+                <span class="section-title">Activity Timeline</span>
+                <div class="activity-timeline" id="activityTimeline">
+                    <p class="timeline-empty">Search a profile to start the analysis feed.</p>
+                </div>
+            </div>
+
+            <div class="activity-section achievements-section">
                 <span class="section-title">Unlocked Achievements</span>
                 <div class="badges-timeline" id="badgesContainer">
                     <p class="timeline-empty">Search a profile to view earned achievements.</p>
                 </div>
             </div>
-
-            <!-- API Limits Display inside Right Sidebar -->
-            <div class="sidebar-limits-card">
-                <div class="limit-row">
-                    <span class="limit-lbl">Remaining Requests</span>
-                    <strong id="limitRemainingVal">60</strong>
-                </div>
-                <div class="limit-row">
-                    <span class="limit-lbl">Total Rate Limit</span>
-                    <strong id="limitMaxVal">60</strong>
-                </div>
-                <div class="limit-row">
-                    <span class="limit-lbl">Resetting At</span>
-                    <strong id="limitResetVal">--:--</strong>
-                </div>
-            </div>
         </aside>
     </div>
+
+    <!-- Sidebar overlay for Mobile drawer backdrop -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleMobileSidebar()"></div>
 
     <!-- CREDENTIALS / SETTINGS MODAL -->
     <div id="settingsModal" class="modal-overlay hidden">
@@ -421,6 +468,6 @@
     </div>
 
     <!-- Script file -->
-    <script src="app.js"></script>
+    <script src="app.js?v=2"></script>
 </body>
 </html>
