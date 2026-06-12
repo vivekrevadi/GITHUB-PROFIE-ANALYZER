@@ -1,0 +1,13 @@
+{
+  "name": "gexplorer-github-profile-analyzer",
+  "version": "1.0.0",
+  "description": "A premium GitHub profile analyzer and comparison tool built with HTML, CSS, and JS.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  }
+}
